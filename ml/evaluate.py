@@ -24,8 +24,16 @@ if os.path.exists("D:\\"):
     os.environ["HF_HOME"] = r"D:\hf_cache"
     os.makedirs(r"D:\hf_cache", exist_ok=True)
 
-import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+try:
+    import torch
+    from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+    HAS_TORCH = True
+except (ImportError, Exception):
+    torch = None
+    AutoTokenizer = None
+    AutoModelForSeq2SeqLM = None
+    HAS_TORCH = False
+
 from ml.schema import TraceSpotQuery, sanitize_and_validate_dict
 from ml.rules import parse_query_rule_based
 
@@ -178,8 +186,11 @@ class TraceSpotInferenceEngine:
         self.checkpoint_dir = checkpoint_dir
         self.model = None
         self.tokenizer = None
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.load_model()
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu") if (HAS_TORCH and torch is not None) else "cpu"
+        if HAS_TORCH and torch is not None:
+            self.load_model()
+        else:
+            print("[*] PyTorch not loaded; running with high-speed rule-based engine.")
 
     def load_model(self):
         if os.path.exists(self.checkpoint_dir) and (
