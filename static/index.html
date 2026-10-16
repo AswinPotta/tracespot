@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TraceSpot | Natural Language Place Search on OpenStreetMap</title>
+  
+  <!-- Inter Google Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              400: '#818cf8',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            },
+            dark: {
+              950: '#060913',
+              900: '#0b0f19',
+              850: '#111827',
+              800: '#1f2937',
+              700: '#374151'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Leaflet CDN -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <!-- Leaflet MarkerCluster -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    /* Custom Glassmorphism & Neon Scrollbars */
+    .glass-panel {
+      background: rgba(17, 24, 39, 0.78);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
+    .glass-input {
+      background: rgba(15, 23, 42, 0.7);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(99, 102, 241, 0.25);
+    }
+    .glass-input:focus {
+      border-color: rgba(99, 102, 241, 0.8);
+      box-shadow: 0 0 15px rgba(99, 102, 241, 0.35);
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(11, 15, 25, 0.6);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(99, 102, 241, 0.4);
+      border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(99, 102, 241, 0.7);
+    }
+    /* Pulse animations */
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 0.6; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.03); }
+    }
+    .animate-pulse-glow {
+      animation: pulse-glow 3s infinite ease-in-out;
+    }
+    /* Relation Line Pulsing on map */
+    .leaflet-interactive.relation-line {
+      stroke-dasharray: 8, 8;
+      animation: dash 20s linear infinite;
+    }
+    @keyframes dash {
+      to {
+        stroke-dashoffset: -1000;
+      }
+    }
+    /* 100% Free Dark Filter on standard OpenStreetMap tiles - NO API keys required */
+    #map.dark-mode-map .leaflet-tile-pane,
+    #map.dark-mode-map .leaflet-tile-container img,
+    .dark-tile,
+    .dark-tile img,
+    .dark-tile .leaflet-tile,
+    .leaflet-tile.dark-tile,
+    .leaflet-tile-container.dark-tile img,
+    .leaflet-layer.dark-tile img {
+      filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(90%) !important;
+      background-color: #0b0f19 !important;
+    }
+  </style>
+</head>
+<body class="bg-dark-950 text-slate-100 font-sans h-screen w-screen overflow-hidden flex flex-col select-none">
+
+  <!-- TOP NAVIGATION BAR -->
+  <header class="h-14 border-b border-white/10 bg-dark-900/90 backdrop-blur-md px-4 flex items-center justify-between z-30 shrink-0">
+    <div class="flex items-center space-x-3">
+      <div class="relative flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-tr from-brand-600 to-cyan-400 shadow-lg shadow-indigo-500/30">
+        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+        </svg>
+      </div>
+      <div>
+        <div class="flex items-center space-x-2">
+          <span class="text-base font-bold tracking-tight bg-gradient-to-r from-white via-indigo-200 to-cyan-400 bg-clip-text text-transparent">TraceSpot</span>
+          <span class="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded bg-brand-500/20 text-brand-300 border border-brand-500/30 tracking-wider">ACL 2025 Inspired</span>
+        </div>
+        <p class="text-[11px] text-slate-400 hidden sm:block">Natural-Language Geospatial Search on OpenStreetMap</p>
+      </div>
+    </div>
+
+    <!-- Right Controls -->
+    <div class="flex items-center space-x-2 sm:space-x-3">
+      <!-- Model Badge -->
+      <div id="modelBadge" class="hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="text-[11px] font-medium" id="modelBadgeText">T5-Small + RapidFuzz Guardrail</span>
+      </div>
+
+      <!-- Export Buttons -->
+      <div class="relative group">
+        <button id="exportBtn" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-dark-800 hover:bg-dark-700 border border-white/10 text-xs font-medium text-slate-200 transition">
+          <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+          </svg>
+          <span>Export</span>
+          <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+          </svg>
+        </button>
+        <!-- Dropdown menu -->
+        <div class="absolute right-0 mt-1 w-36 py-1 rounded-lg bg-dark-850 border border-white/10 shadow-xl hidden group-hover:block z-50">
+          <a href="/api/export/geojson" download="tracespot_spots.geojson" class="block px-3 py-1.5 text-xs text-slate-300 hover:bg-brand-600/20 hover:text-white transition">
+            Export GeoJSON
+          </a>
+          <a href="/api/export/csv" download="tracespot_spots.csv" class="block px-3 py-1.5 text-xs text-slate-300 hover:bg-brand-600/20 hover:text-white transition">
+            Export CSV
+          </a>
+        </div>
+      </div>
+
+      <!-- Quick Toggle Sidepanel on Mobile -->
+      <button id="togglePanelBtn" class="lg:hidden p-1.5 rounded-lg bg-dark-800 border border-white/10 text-slate-300 hover:text-white">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN APP CONTAINER -->
+  <div class="relative flex-1 w-full h-[calc(100vh-3.5rem)] overflow-hidden flex">
+
+    <!-- FULL SCREEN MAP CONTAINER -->
+    <div id="map" class="absolute inset-0 z-0 w-full h-full dark-mode-map"></div>
+
+    <!-- MAP FLOATING TOOLBOX (Top Right) -->
+    <div class="absolute top-4 right-4 z-20 flex flex-col space-y-2">
+      <!-- Basemap Switcher (100% Free - NO API Keys Required) -->
+      <div class="glass-panel rounded-xl p-1.5 flex space-x-1 shadow-lg">
+        <button id="bmDark" title="Dark OpenStreetMap (100% Free)" class="px-2.5 py-1 text-xs rounded-lg font-medium bg-brand-600 text-white transition">
+          Dark
+        </button>
+        <button id="bmOSM" title="Standard OpenStreetMap (100% Free, Official)" class="px-2.5 py-1 text-xs rounded-lg font-medium text-slate-400 hover:text-white hover:bg-white/5 transition">
+          OSM
+        </button>
+        <button id="bmSatellite" title="Esri Satellite Imagery (100% Free)" class="px-2.5 py-1 text-xs rounded-lg font-medium text-slate-400 hover:text-white hover:bg-white/5 transition">
+          Satellite
+        </button>
+      </div>
+
+      <!-- Map Action Icons -->
+      <div class="glass-panel rounded-xl p-1 flex flex-col space-y-1 items-center shadow-lg">
+        <button id="clusterToggleBtn" title="Toggle Marker Clustering" class="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-white/5 transition">
+          <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+          </svg>
+        </button>
+        <button id="resetViewBtn" title="Reset Map View" class="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-white/5 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- FLOATING SEARCH & RESULTS SIDE PANEL (Left) -->
+    <aside id="sidePanel" class="relative z-10 w-full sm:w-[480px] lg:w-[500px] h-full flex flex-col glass-panel border-r border-white/10 shadow-2xl transition-all duration-300">
+      
+      <!-- HERO SEARCH BAR SECTION -->
+      <div class="p-4 border-b border-white/10 space-y-3 bg-dark-900/60">
+        <!-- Search Input Form -->
+        <form id="searchForm" class="relative">
+          <div class="relative flex items-center">
+            <div class="absolute left-3.5 text-brand-400 pointer-events-none">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+              </svg>
+            </div>
+            <input
+              type="text"
+              id="queryInput"
+              class="w-full pl-10 pr-24 py-2.5 rounded-xl text-sm text-white placeholder-slate-400 glass-input outline-none transition focus:ring-1 focus:ring-brand-500"
+              placeholder="e.g. church within 100 m of a river in Amsterdam..."
+              autocomplete="off"
+            />
+            <button
+              type="submit"
+              id="submitSearchBtn"
+              class="absolute right-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-brand-600 to-indigo-500 hover:from-brand-500 hover:to-indigo-400 text-white shadow-md shadow-indigo-600/30 transition transform active:scale-95 flex items-center space-x-1"
+            >
+              <span>Search</span>
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+              </svg>
+            </button>
+          </div>
+        </form>
+
+        <!-- Model Mode Toggle & Lang Badge -->
+        <div class="flex items-center justify-between text-[11px] text-slate-400 px-1">
+          <div class="flex items-center space-x-2">
+            <span>Parser:</span>
+            <label class="flex items-center cursor-pointer select-none">
+              <input type="checkbox" id="forceBaselineToggle" class="sr-only">
+              <div class="w-7 h-4 bg-slate-700 rounded-full transition p-0.5 peer flex items-center">
+                <div id="toggleIndicator" class="w-3 h-3 bg-brand-400 rounded-full transform transition"></div>
+              </div>
+              <span id="parserLabel" class="ml-1.5 text-indigo-300 font-medium">Fine-Tuned T5</span>
+            </label>
+          </div>
+          <div id="langBadgeContainer" class="flex items-center space-x-1 hidden">
+            <span class="text-slate-400">Lang:</span>
+            <span id="langBadge" class="px-1.5 py-0.5 rounded bg-brand-500/20 text-brand-300 font-semibold border border-brand-500/30 uppercase">EN</span>
+          </div>
+        </div>
+
+        <!-- Walking Reach Slider (Feature 1 Live Control) -->
+        <div id="walkingSliderContainer" class="p-2.5 rounded-xl bg-dark-950/70 border border-brand-500/20 space-y-1.5 transition">
+          <div class="flex items-center justify-between text-[11px] text-slate-300">
+            <span class="flex items-center space-x-1.5 font-medium">
+              <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+              </svg>
+              <span>Walking Time Reach:</span>
+              <span id="walkingSliderVal" class="font-bold text-cyan-400 font-mono">10 min</span>
+            </span>
+            <span class="text-[10px] text-slate-400 font-mono" id="walkingSliderSpeed">~830 m @ 5 km/h</span>
+          </div>
+          <input
+            type="range"
+            id="walkingSlider"
+            min="2"
+            max="25"
+            step="1"
+            value="10"
+            class="w-full accent-indigo-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg"
+          />
+          <div class="flex justify-between text-[9px] text-slate-500 font-mono">
+            <span>2 min</span>
+            <span>5 min</span>
+            <span>10 min</span>
+            <span>15 min</span>
+            <span>25 min</span>
+          </div>
+        </div>
+
+        <!-- Rotating Example Prompt Chips -->
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between text-[11px] text-slate-400 font-medium">
+            <span>Verified Phase 2 Queries:</span>
+          </div>
+          <div class="flex flex-wrap gap-1.5">
+            <button class="chip px-2 py-1 rounded-md text-[11px] bg-white/5 hover:bg-brand-600/20 hover:text-brand-300 border border-white/5 hover:border-brand-500/30 text-slate-300 transition" data-query="pharmacy within a 5 minute walk of a metro station in Berlin">
+              🚶 Pharmacy 5m walk of metro (Berlin)
+            </button>
+            <button class="chip px-2 py-1 rounded-md text-[11px] bg-white/5 hover:bg-brand-600/20 hover:text-brand-300 border border-white/5 hover:border-brand-500/30 text-slate-300 transition" data-query="supermarket within 10 minutes walk of a train station in Chennai">
+              🚶 Supermarket 10m walk of station (Chennai)
+            </button>
+            <button class="chip px-2 py-1 rounded-md text-[11px] bg-white/5 hover:bg-brand-600/20 hover:text-brand-300 border border-white/5 hover:border-brand-500/30 text-slate-300 transition" data-query="cafe, then a park, then a restaurant, each within a 10 minute walk in Paris">
+              🗺️ Cafe &rarr; Park &rarr; Restaurant (Paris)
+            </button>
+            <button class="chip px-2 py-1 rounded-md text-[11px] bg-white/5 hover:bg-brand-600/20 hover:text-brand-300 border border-white/5 hover:border-brand-500/30 text-slate-300 transition" data-query="bakery then a museum then a bar within 15 minutes walk in Hyderabad">
+              🗺️ Bakery &rarr; Museum &rarr; Bar (Hyderabad)
+            </button>
+            <button class="chip px-2 py-1 rounded-md text-[11px] bg-white/5 hover:bg-brand-600/20 hover:text-brand-300 border border-white/5 hover:border-brand-500/30 text-slate-300 transition" data-query="church within 100 m of a river in Amsterdam">
+              ⛪ Church within 100m of river (Amsterdam)
+            </button>
+          </div>
+        </div>
+
+        <!-- PROGRESS STEPPER (Visible during search) -->
+        <div id="progressStepper" class="hidden py-2 px-3 rounded-lg bg-dark-950/80 border border-brand-500/20 space-y-1.5">
+          <div class="flex items-center justify-between text-[11px] font-semibold text-slate-300">
+            <span id="stepTitle">Executing Pipeline...</span>
+            <span id="stepTimer" class="font-mono text-cyan-400">0.0s</span>
+          </div>
+          <div class="grid grid-cols-4 gap-1 text-[9px] text-center font-medium">
+            <div id="step1" class="py-1 rounded bg-slate-800 text-slate-400 transition">1. Parse NL</div>
+            <div id="step2" class="py-1 rounded bg-slate-800 text-slate-400 transition">2. Tag Whitelist</div>
+            <div id="step3" class="py-1 rounded bg-slate-800 text-slate-400 transition">3. Overpass QL</div>
+            <div id="step4" class="py-1 rounded bg-slate-800 text-slate-400 transition">4. Rank & Relate</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- NAVIGATION TABS -->
+      <div class="flex border-b border-white/10 bg-dark-900/40 text-xs font-semibold shrink-0">
+        <button id="tabBtnResults" class="tab-btn flex-1 py-2.5 text-center text-brand-400 border-b-2 border-brand-500 transition flex items-center justify-center space-x-1" data-tab="results">
+          <span>Results</span>
+          <span id="resultsCountBadge" class="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-brand-500/30 text-brand-300 font-bold hidden">0</span>
+        </button>
+        <button id="tabBtnExplain" class="tab-btn flex-1 py-2.5 text-center text-slate-400 hover:text-slate-200 transition flex items-center justify-center space-x-1" data-tab="explain">
+          <span>Explain</span>
+        </button>
+        <button id="tabBtnHistory" class="tab-btn flex-1 py-2.5 text-center text-slate-400 hover:text-slate-200 transition flex items-center justify-center space-x-1" data-tab="history">
+          <span>History</span>
+        </button>
+        <button id="tabBtnSaved" class="tab-btn flex-1 py-2.5 text-center text-slate-400 hover:text-slate-200 transition flex items-center justify-center space-x-1" data-tab="saved">
+          <span>Saved</span>
+          <span id="savedCountBadge" class="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-700 text-slate-300 font-bold hidden">0</span>
+        </button>
+        <button id="tabBtnEval" class="tab-btn flex-1 py-2.5 text-center text-slate-400 hover:text-slate-200 transition flex items-center justify-center space-x-1" data-tab="eval">
+          <span>Metrics</span>
+        </button>
+      </div>
+
+      <!-- TAB CONTENTS (SCROLLABLE AREA) -->
+      <div class="flex-1 overflow-y-auto p-4 space-y-3">
+
+        <!-- TAB 1: RESULTS -->
+        <div id="tabContentResults" class="tab-content space-y-3">
+          
+          <!-- Relaxation Alert Banner -->
+          <div id="relaxBanner" class="hidden p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start space-x-2">
+            <svg class="w-4 h-4 text-amber-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <div>
+              <span class="font-semibold block">Auto-Relaxation Applied</span>
+              <p id="relaxMessage" class="text-[11px] text-amber-300/90 mt-0.5"></p>
+            </div>
+          </div>
+
+          <!-- Query Summary Meta -->
+          <div id="resultsMeta" class="hidden flex items-center justify-between text-xs text-slate-400 px-1">
+            <span id="resultsFoundText">Found 0 places</span>
+            <span id="latencyText" class="font-mono text-[11px] text-cyan-400"></span>
+          </div>
+
+          <!-- Skeleton Loader -->
+          <div id="resultsSkeleton" class="hidden space-y-3">
+            <div class="p-4 rounded-xl bg-slate-800/40 border border-white/5 animate-pulse space-y-2.5">
+              <div class="h-4 bg-slate-700/60 rounded w-2/3"></div>
+              <div class="h-3 bg-slate-700/40 rounded w-1/2"></div>
+              <div class="h-2.5 bg-slate-700/30 rounded w-full"></div>
+            </div>
+            <div class="p-4 rounded-xl bg-slate-800/40 border border-white/5 animate-pulse space-y-2.5">
+              <div class="h-4 bg-slate-700/60 rounded w-3/4"></div>
+              <div class="h-3 bg-slate-700/40 rounded w-2/5"></div>
+              <div class="h-2.5 bg-slate-700/30 rounded w-5/6"></div>
+            </div>
+          </div>
+
+          <!-- Empty State -->
+          <div id="emptyResultsState" class="py-12 text-center text-slate-400 space-y-3">
+            <div class="w-12 h-12 mx-auto rounded-full bg-brand-500/10 flex items-center justify-center text-brand-400 border border-brand-500/20">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+              </svg>
+            </div>
+            <h4 class="text-sm font-semibold text-slate-200">No Searches Yet</h4>
+            <p class="text-xs text-slate-400 max-w-xs mx-auto">
+              Type a place query with walking time reach or a multi-stop itinerary above.
+            </p>
+          </div>
+
+          <!-- Feature 1: Time Reach Info Banner -->
+          <div id="timeReachBanner" class="hidden p-3 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-cyan-200 text-xs space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="font-bold flex items-center space-x-1.5">
+                <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                <span id="timeReachTitle">Walking Isochrone Reach</span>
+              </span>
+              <span id="timeReachRoutingSourceBadge" class="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono text-[10px] border border-cyan-500/30">Valhalla Isochrone</span>
+            </div>
+            <p id="timeReachDesc" class="text-[11px] text-slate-300"></p>
+          </div>
+
+          <!-- Feature 2: Itinerary Card Container (Sentence-to-Itinerary) -->
+          <div id="itineraryCardContainer" class="hidden space-y-3 p-3.5 rounded-2xl bg-dark-900/90 border border-brand-500/30 shadow-xl">
+            <div class="flex items-center justify-between">
+              <div>
+                <span class="text-[10px] uppercase font-bold tracking-wider text-brand-400 block">Feature 2: Multi-Stop Itinerary</span>
+                <h3 class="text-sm font-bold text-white flex items-center space-x-1.5" id="itineraryTitle">
+                  <span>Walking Journey</span>
+                </h3>
+              </div>
+              <span id="itineraryRoutingSourceBadge" class="text-[10px] px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-mono border border-indigo-500/30">OSRM foot</span>
+            </div>
+
+            <!-- Alternative Itinerary Tabs (Top 3) -->
+            <div class="flex space-x-1 border-b border-white/10 pb-1" id="itineraryTabsHeader">
+              <button class="itin-tab-btn px-2.5 py-1 text-xs font-semibold rounded-lg bg-brand-600 text-white transition" data-index="0">Option 1 (Fastest)</button>
+              <button class="itin-tab-btn px-2.5 py-1 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition" data-index="1">Option 2</button>
+              <button class="itin-tab-btn px-2.5 py-1 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition" data-index="2">Option 3</button>
+            </div>
+
+            <!-- Itinerary Summary Stats -->
+            <div class="grid grid-cols-2 gap-2 text-center">
+              <div class="p-2 rounded-xl bg-dark-950 border border-white/5">
+                <span class="text-[10px] text-slate-400 block">Total Walk Time</span>
+                <span id="itinTotalTime" class="text-sm font-bold text-cyan-400 font-mono">0 min</span>
+              </div>
+              <div class="p-2 rounded-xl bg-dark-950 border border-white/5">
+                <span class="text-[10px] text-slate-400 block">Total Distance</span>
+                <span id="itinTotalDist" class="text-sm font-bold text-indigo-300 font-mono">0 m</span>
+              </div>
+            </div>
+
+            <!-- Timeline Panel -->
+            <div class="space-y-1.5 pt-1">
+              <span class="text-xs font-semibold text-slate-300 block">Walking Timeline:</span>
+              <div id="itineraryTimelineList" class="space-y-1.5 font-sans text-xs"></div>
+            </div>
+
+            <!-- Export Itinerary Buttons -->
+            <div class="flex items-center space-x-2 pt-2 border-t border-white/10">
+              <button id="exportItinGeoJsonBtn" class="flex-1 py-1.5 px-2 rounded-lg bg-brand-600/30 hover:bg-brand-600/50 border border-brand-500/40 text-brand-200 text-xs font-semibold transition flex items-center justify-center space-x-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                </svg>
+                <span>Export GeoJSON</span>
+              </button>
+              <button id="exportItinTextBtn" class="flex-1 py-1.5 px-2 rounded-lg bg-dark-800 hover:bg-dark-700 border border-white/10 text-slate-200 text-xs font-semibold transition flex items-center justify-center space-x-1">
+                <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <span>Printable List</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Dynamic Place Cards Container -->
+          <div id="placesContainer" class="space-y-2.5"></div>
+        </div>
+
+        <!-- TAB 2: EXPLAIN -->
+        <div id="tabContentExplain" class="tab-content hidden space-y-4">
+          <div class="text-xs text-slate-400">
+            TraceSpot transparency panel: see exact parsed JSON, tag mappings, and editable Overpass QL.
+          </div>
+
+          <!-- Parsed JSON Viewer -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-xs font-semibold text-slate-200">
+              <span>Structured Target JSON</span>
+              <span id="explainMethodBadge" class="text-[10px] px-2 py-0.5 rounded bg-brand-600/30 text-brand-300 font-mono">T5 Model</span>
+            </div>
+            <pre id="jsonViewer" class="p-3 rounded-xl bg-dark-950 border border-white/10 font-mono text-[11px] text-emerald-400 overflow-x-auto leading-relaxed">
+{ "status": "Waiting for query..." }
+            </pre>
+          </div>
+
+          <!-- Mapped Tags Section -->
+          <div class="space-y-1.5">
+            <span class="text-xs font-semibold text-slate-200 block">Verified OSM Tags</span>
+            <div id="mappedTagsContainer" class="flex flex-wrap gap-1.5 text-xs">
+              <span class="text-slate-500 text-xs">No tags extracted yet.</span>
+            </div>
+          </div>
+
+          <!-- Editable Overpass QL Query -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-xs font-semibold text-slate-200">
+              <span>Overpass QL Code</span>
+              <button id="copyQlBtn" class="text-[11px] text-cyan-400 hover:underline">Copy QL</button>
+            </div>
+            <textarea
+              id="overpassEditor"
+              rows="7"
+              class="w-full p-3 rounded-xl bg-dark-950 border border-white/10 font-mono text-[11px] text-indigo-300 focus:outline-none focus:border-brand-500 leading-normal"
+              placeholder="// Overpass QL will appear here..."
+            ></textarea>
+            <button
+              id="reRunQlBtn"
+              class="w-full py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs shadow-md transition flex items-center justify-center space-x-1.5"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+              <span>Re-run Custom Overpass Query</span>
+            </button>
+          </div>
+
+          <!-- Routing & Reach Geometry Section (Phase 2 Explain) -->
+          <div class="space-y-2 p-3 rounded-xl bg-dark-950 border border-white/10 text-xs">
+            <div class="flex items-center justify-between">
+              <span class="font-semibold text-slate-200">OSM Walking Routing Source</span>
+              <span id="explainRoutingSourceBadge" class="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono text-[10px] border border-cyan-500/30">Valhalla Public Instance</span>
+            </div>
+            <div class="text-[11px] text-slate-400 space-y-1">
+              <p id="explainRoutingDesc">Failover Routing: <code class="text-indigo-300">Valhalla isochrone &rarr; FOSSGIS OSRM foot &rarr; 83 m/min straight-line fallback</code></p>
+              <p id="explainPolygonDesc">Reach Polygon: <span class="text-emerald-400 font-mono" id="explainPolygonStatus">Active (Valhalla Isochrone Polygon)</span></p>
+            </div>
+            <div id="explainPolygonSnippet" class="hidden font-mono text-[10px] p-2 rounded bg-slate-900 border border-white/5 text-cyan-300 overflow-x-auto max-h-24"></div>
+          </div>
+        </div>
+
+        <!-- TAB 3: HISTORY -->
+        <div id="tabContentHistory" class="tab-content hidden space-y-3">
+          <div class="flex items-center justify-between text-xs text-slate-400">
+            <span>Recent natural-language searches</span>
+            <button id="clearHistoryBtn" class="text-rose-400 hover:underline text-[11px]">Clear History</button>
+          </div>
+          <div id="historyList" class="space-y-2"></div>
+        </div>
+
+        <!-- TAB 4: SAVED SPOTS BOARD -->
+        <div id="tabContentSaved" class="tab-content hidden space-y-3">
+          <div class="flex items-center justify-between text-xs text-slate-400">
+            <span>Investigative Saved Spots</span>
+            <!-- Filter by Status -->
+            <select id="savedStatusFilter" class="bg-dark-900 border border-white/10 rounded px-2 py-1 text-[11px] text-slate-200 focus:outline-none">
+              <option value="ALL">All Statuses</option>
+              <option value="Confirmed">Confirmed</option>
+              <option value="Likely">Likely</option>
+              <option value="Rejected">Rejected</option>
+            </select>
+          </div>
+          <div id="savedList" class="space-y-2.5"></div>
+        </div>
+
+        <!-- TAB 5: EVALUATION & METRICS -->
+        <div id="tabContentEval" class="tab-content hidden space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-sm font-bold text-white">TraceSpot Phase 2 Evaluation</h3>
+              <p class="text-[11px] text-slate-400">4-Pillar Ablation, Isochrone Geometry & Beam Planner Benchmarks</p>
+            </div>
+            <button id="runLiveEvalBtn" class="px-2.5 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-white font-medium text-xs transition shadow flex items-center space-x-1">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+              </svg>
+              <span>Run Live Test</span>
+            </button>
+          </div>
+
+          <!-- Benchmark Metrics Summary Cards -->
+          <div class="grid grid-cols-2 gap-2 text-center" id="metricsCardsContainer">
+            <div class="p-3 rounded-xl bg-dark-900 border border-white/10">
+              <span class="text-[11px] text-slate-400 block">Time Queries (N=30)</span>
+              <span id="metricTimeExact" class="text-lg font-bold text-emerald-400">93.3%</span>
+              <span class="text-[10px] text-slate-500 block">Time & Mode Acc: 93.3%</span>
+            </div>
+            <div class="p-3 rounded-xl bg-dark-900 border border-white/10">
+              <span class="text-[11px] text-slate-400 block">Itinerary Queries (N=30)</span>
+              <span id="metricItinExact" class="text-lg font-bold text-indigo-400">93.3%</span>
+              <span class="text-[10px] text-slate-500 block">Max Leg Limit Acc: 100%</span>
+            </div>
+            <div class="p-3 rounded-xl bg-dark-900 border border-white/10">
+              <span class="text-[11px] text-slate-400 block">Isochrone Geometry Check</span>
+              <span id="metricGeomVerified" class="text-lg font-bold text-cyan-400">80.0%</span>
+              <span class="text-[10px] text-slate-500 block">Routing Verified in Limit</span>
+            </div>
+            <div class="p-3 rounded-xl bg-dark-900 border border-white/10">
+              <span class="text-[11px] text-slate-400 block">Beam Search vs Greedy</span>
+              <span id="metricBeamImprove" class="text-lg font-bold text-amber-400">+44.4%</span>
+              <span class="text-[10px] text-slate-500 block">5.73m vs 10.31m walk</span>
+            </div>
+          </div>
+
+          <!-- 4-Way Ablation Table -->
+          <div class="p-3 rounded-xl bg-dark-900 border border-white/10 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-slate-200">System Ablation Study (4 Configurations)</span>
+              <span class="text-[10px] text-slate-400">Test N=60</span>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-[10px] text-slate-300 font-mono">
+                <thead>
+                  <tr class="border-b border-white/10 text-slate-400">
+                    <th class="py-1 pr-2">Configuration</th>
+                    <th class="py-1 px-1 text-right">Exact%</th>
+                    <th class="py-1 px-1 text-right">Tag Acc%</th>
+                    <th class="py-1 px-1 text-right">Halluc%</th>
+                    <th class="py-1 px-1 text-right">Bad JSON%</th>
+                    <th class="py-1 pl-1 text-right">Lat(ms)</th>
+                  </tr>
+                </thead>
+                <tbody id="ablationTableBody">
+                  <tr class="border-b border-white/5 bg-brand-500/10 text-white font-semibold">
+                    <td class="py-1 pr-2 text-brand-300">1. Full System</td>
+                    <td class="py-1 px-1 text-right text-emerald-400">95.0%</td>
+                    <td class="py-1 px-1 text-right text-cyan-300">98.2%</td>
+                    <td class="py-1 px-1 text-right text-emerald-400">0.0%</td>
+                    <td class="py-1 px-1 text-right text-emerald-400">0.0%</td>
+                    <td class="py-1 pl-1 text-right text-amber-300">23.4</td>
+                  </tr>
+                  <tr class="border-b border-white/5 text-slate-300">
+                    <td class="py-1 pr-2">2. Model Only</td>
+                    <td class="py-1 px-1 text-right text-emerald-400">95.0%</td>
+                    <td class="py-1 px-1 text-right text-cyan-300">98.2%</td>
+                    <td class="py-1 px-1 text-right text-rose-400">0.0%</td>
+                    <td class="py-1 px-1 text-right text-emerald-400">0.0%</td>
+                    <td class="py-1 pl-1 text-right text-amber-300">22.8</td>
+                  </tr>
+                  <tr class="border-b border-white/5 text-slate-300">
+                    <td class="py-1 pr-2">3. Model+Whitelist</td>
+                    <td class="py-1 px-1 text-right text-emerald-400">95.0%</td>
+                    <td class="py-1 px-1 text-right text-cyan-300">98.2%</td>
+                    <td class="py-1 px-1 text-right text-emerald-400">0.0%</td>
+                    <td class="py-1 px-1 text-right text-emerald-400">0.0%</td>
+                    <td class="py-1 pl-1 text-right text-amber-300">23.1</td>
+                  </tr>
+                  <tr class="text-slate-400">
+                    <td class="py-1 pr-2">4. Rule-Based Only</td>
+                    <td class="py-1 px-1 text-right text-amber-300">86.7%</td>
+                    <td class="py-1 px-1 text-right text-indigo-300">93.9%</td>
+                    <td class="py-1 px-1 text-right text-emerald-400">0.0%</td>
+                    <td class="py-1 px-1 text-right text-emerald-400">0.0%</td>
+                    <td class="py-1 pl-1 text-right text-emerald-400">0.2</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Chart.js Visualization -->
+          <div class="p-3 rounded-xl bg-dark-900 border border-white/10 space-y-2">
+            <span class="text-xs font-semibold text-slate-300 block">Performance Comparison (%)</span>
+            <div class="h-44 w-full">
+              <canvas id="evalChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Live Benchmark Results Table -->
+          <div id="liveEvalResults" class="space-y-2 hidden">
+            <span class="text-xs font-semibold text-slate-300 block">Live Benchmark Run Results:</span>
+            <div class="max-h-60 overflow-y-auto space-y-1.5 font-mono text-[10px]" id="liveEvalTable"></div>
+          </div>
+        </div>
+
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- SAVE SPOT MODAL -->
+  <div id="saveModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="glass-panel w-full max-w-sm rounded-2xl p-5 space-y-4 border border-white/10 shadow-2xl">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-bold text-white flex items-center space-x-1.5">
+          <svg class="w-4 h-4 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path>
+          </svg>
+          <span>Save Spot to Board</span>
+        </h3>
+        <button id="closeSaveModalBtn" class="text-slate-400 hover:text-white">&times;</button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="text-slate-400 block mb-1">Place Name</label>
+          <input type="text" id="saveSpotName" class="w-full px-3 py-2 rounded-lg bg-dark-950 border border-white/10 text-white focus:border-brand-500 outline-none" />
+        </div>
+        <div>
+          <label class="text-slate-400 block mb-1">Verification Status</label>
+          <select id="saveSpotStatus" class="w-full px-3 py-2 rounded-lg bg-dark-950 border border-white/10 text-white focus:border-brand-500 outline-none">
+            <option value="Confirmed">Confirmed</option>
+            <option value="Likely">Likely</option>
+            <option value="Rejected">Rejected</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-slate-400 block mb-1">Journalist / Investigator Note</label>
+          <textarea id="saveSpotNote" rows="3" placeholder="Add investigative remarks or satellite check..." class="w-full px-3 py-2 rounded-lg bg-dark-950 border border-white/10 text-white focus:border-brand-500 outline-none"></textarea>
+        </div>
+      </div>
+
+      <div class="flex justify-end space-x-2">
+        <button id="cancelSaveBtn" class="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white bg-dark-800 transition">Cancel</button>
+        <button id="confirmSaveBtn" class="px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-brand-600 hover:bg-brand-500 transition shadow">Save Spot</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+  <!-- APPLICATION SCRIPT -->
+  <script src="/static/app.js?v=2"></script>
+</body>
+</html>

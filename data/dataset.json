@@ -1,0 +1,329 @@
+{
+  "train": 4500,
+  "test": 500,
+  "samples": [
+    {
+      "input_text": "visit a monument, then a coffee shop, then ciyt park in Brussels",
+      "target_json": {
+        "area": "Brussels",
+        "entities": [
+          {
+            "id": 1,
+            "name": "attraction",
+            "tags": [
+              "tourism=attraction"
+            ]
+          },
+          {
+            "id": 2,
+            "name": "cafe",
+            "tags": [
+              "amenity=cafe"
+            ]
+          },
+          {
+            "id": 3,
+            "name": "park",
+            "tags": [
+              "leisure=park"
+            ]
+          }
+        ],
+        "relations": [],
+        "itinerary": {
+          "stops": [
+            {
+              "id": 1,
+              "name": "attraction",
+              "tags": [
+                "tourism=attraction"
+              ]
+            },
+            {
+              "id": 2,
+              "name": "cafe",
+              "tags": [
+                "amenity=cafe"
+              ]
+            },
+            {
+              "id": 3,
+              "name": "park",
+              "tags": [
+                "leisure=park"
+              ]
+            }
+          ],
+          "max_leg_min": 10
+        }
+      },
+      "target_text": "{\"area\":\"Brussels\",\"entities\":[{\"id\":1,\"name\":\"attraction\",\"tags\":[\"tourism=attraction\"]},{\"id\":2,\"name\":\"cafe\",\"tags\":[\"amenity=cafe\"]},{\"id\":3,\"name\":\"park\",\"tags\":[\"leisure=park\"]}],\"relations\":[],\"itinerary\":{\"stops\":[{\"id\":1,\"name\":\"attraction\",\"tags\":[\"tourism=attraction\"]},{\"id\":2,\"name\":\"cafe\",\"tags\":[\"amenity=cafe\"]},{\"id\":3,\"name\":\"park\",\"tags\":[\"leisure=park\"]}],\"max_leg_min\":10}}"
+    },
+    {
+      "input_text": "apothecary close to a metro in new york",
+      "target_json": {
+        "area": "New York",
+        "entities": [
+          {
+            "id": 1,
+            "name": "pharmacy",
+            "tags": [
+              "amenity=pharmacy"
+            ]
+          },
+          {
+            "id": 2,
+            "name": "metro station",
+            "tags": [
+              "railway=subway_entrance"
+            ]
+          }
+        ],
+        "relations": [
+          {
+            "type": "within",
+            "a": 1,
+            "b": 2,
+            "distance_m": 150
+          }
+        ]
+      },
+      "target_text": "{\"area\":\"New York\",\"entities\":[{\"id\":1,\"name\":\"pharmacy\",\"tags\":[\"amenity=pharmacy\"]},{\"id\":2,\"name\":\"metro station\",\"tags\":[\"railway=subway_entrance\"]}],\"relations\":[{\"type\":\"within\",\"a\":1,\"b\":2,\"distance_m\":150}]}"
+    },
+    {
+      "input_text": "find coffee shop within a 5 minute walk of a fountain in New York",
+      "target_json": {
+        "area": "New York",
+        "entities": [
+          {
+            "id": 1,
+            "name": "cafe",
+            "tags": [
+              "amenity=cafe"
+            ]
+          },
+          {
+            "id": 2,
+            "name": "fountain",
+            "tags": [
+              "amenity=fountain"
+            ]
+          }
+        ],
+        "relations": [
+          {
+            "type": "within",
+            "a": 1,
+            "b": 2,
+            "time_min": 5,
+            "mode": "walk"
+          }
+        ]
+      },
+      "target_text": "{\"area\":\"New York\",\"entities\":[{\"id\":1,\"name\":\"cafe\",\"tags\":[\"amenity=cafe\"]},{\"id\":2,\"name\":\"fountain\",\"tags\":[\"amenity=fountain\"]}],\"relations\":[{\"type\":\"within\",\"a\":1,\"b\":2,\"time_min\":5,\"mode\":\"walk\"}]}"
+    },
+    {
+      "input_text": "find drink in Mardid",
+      "target_json": {
+        "area": "Madrid",
+        "entities": [
+          {
+            "id": 1,
+            "name": "bar",
+            "tags": [
+              "amenity=bar"
+            ]
+          }
+        ],
+        "relations": []
+      },
+      "target_text": "{\"area\":\"Madrid\",\"entities\":[{\"id\":1,\"name\":\"bar\",\"tags\":[\"amenity=bar\"]}],\"relations\":[]}"
+    },
+    {
+      "input_text": "drugstore within walking distance of a green space in Toronto",
+      "target_json": {
+        "area": "Toronto",
+        "entities": [
+          {
+            "id": 1,
+            "name": "pharmacy",
+            "tags": [
+              "amenity=pharmacy"
+            ]
+          },
+          {
+            "id": 2,
+            "name": "park",
+            "tags": [
+              "leisure=park"
+            ]
+          }
+        ],
+        "relations": [
+          {
+            "type": "within",
+            "a": 1,
+            "b": 2,
+            "time_min": 10,
+            "mode": "walk"
+          }
+        ]
+      },
+      "target_text": "{\"area\":\"Toronto\",\"entities\":[{\"id\":1,\"name\":\"pharmacy\",\"tags\":[\"amenity=pharmacy\"]},{\"id\":2,\"name\":\"park\",\"tags\":[\"leisure=park\"]}],\"relations\":[{\"type\":\"within\",\"a\":1,\"b\":2,\"time_min\":10,\"mode\":\"walk\"}]}"
+    },
+    {
+      "input_text": "find bike parking within a 3 minute walk of a metro in vienna",
+      "target_json": {
+        "area": "Vienna",
+        "entities": [
+          {
+            "id": 1,
+            "name": "bicycle parking",
+            "tags": [
+              "amenity=bicycle_parking"
+            ]
+          },
+          {
+            "id": 2,
+            "name": "metro station",
+            "tags": [
+              "railway=subway_entrance"
+            ]
+          }
+        ],
+        "relations": [
+          {
+            "type": "within",
+            "a": 1,
+            "b": 2,
+            "time_min": 3,
+            "mode": "walk"
+          }
+        ]
+      },
+      "target_text": "{\"area\":\"Vienna\",\"entities\":[{\"id\":1,\"name\":\"bicycle parking\",\"tags\":[\"amenity=bicycle_parking\"]},{\"id\":2,\"name\":\"metro station\",\"tags\":[\"railway=subway_entrance\"]}],\"relations\":[{\"type\":\"within\",\"a\":1,\"b\":2,\"time_min\":3,\"mode\":\"walk\"}]}"
+    },
+    {
+      "input_text": "tourist attraciton in Geneva",
+      "target_json": {
+        "area": "Geneva",
+        "entities": [
+          {
+            "id": 1,
+            "name": "attraction",
+            "tags": [
+              "tourism=attraction"
+            ]
+          }
+        ],
+        "relations": []
+      },
+      "target_text": "{\"area\":\"Geneva\",\"entities\":[{\"id\":1,\"name\":\"attraction\",\"tags\":[\"tourism=attraction\"]}],\"relations\":[]}"
+    },
+    {
+      "input_text": "drinks, after that a green space, then restaurant in Bangalore",
+      "target_json": {
+        "area": "Bangalore",
+        "entities": [
+          {
+            "id": 1,
+            "name": "bar",
+            "tags": [
+              "amenity=bar"
+            ]
+          },
+          {
+            "id": 2,
+            "name": "park",
+            "tags": [
+              "leisure=park"
+            ]
+          },
+          {
+            "id": 3,
+            "name": "restaurant",
+            "tags": [
+              "amenity=restaurant"
+            ]
+          }
+        ],
+        "relations": [],
+        "itinerary": {
+          "stops": [
+            {
+              "id": 1,
+              "name": "bar",
+              "tags": [
+                "amenity=bar"
+              ]
+            },
+            {
+              "id": 2,
+              "name": "park",
+              "tags": [
+                "leisure=park"
+              ]
+            },
+            {
+              "id": 3,
+              "name": "restaurant",
+              "tags": [
+                "amenity=restaurant"
+              ]
+            }
+          ],
+          "max_leg_min": 10
+        }
+      },
+      "target_text": "{\"area\":\"Bangalore\",\"entities\":[{\"id\":1,\"name\":\"bar\",\"tags\":[\"amenity=bar\"]},{\"id\":2,\"name\":\"park\",\"tags\":[\"leisure=park\"]},{\"id\":3,\"name\":\"restaurant\",\"tags\":[\"amenity=restaurant\"]}],\"relations\":[],\"itinerary\":{\"stops\":[{\"id\":1,\"name\":\"bar\",\"tags\":[\"amenity=bar\"]},{\"id\":2,\"name\":\"park\",\"tags\":[\"leisure=park\"]},{\"id\":3,\"name\":\"restaurant\",\"tags\":[\"amenity=restaurant\"]}],\"max_leg_min\":10}}"
+    },
+    {
+      "input_text": "subway station in Chicago",
+      "target_json": {
+        "area": "Chicago",
+        "entities": [
+          {
+            "id": 1,
+            "name": "metro station",
+            "tags": [
+              "railway=subway_entrance"
+            ]
+          }
+        ],
+        "relations": []
+      },
+      "target_text": "{\"area\":\"Chicago\",\"entities\":[{\"id\":1,\"name\":\"metro station\",\"tags\":[\"railway=subway_entrance\"]}],\"relations\":[]}"
+    },
+    {
+      "input_text": "find a pharmcay next to a park in Pune",
+      "target_json": {
+        "area": "Pune",
+        "entities": [
+          {
+            "id": 1,
+            "name": "pharmacy",
+            "tags": [
+              "amenity=pharmacy"
+            ]
+          },
+          {
+            "id": 2,
+            "name": "park",
+            "tags": [
+              "leisure=park"
+            ]
+          }
+        ],
+        "relations": [
+          {
+            "type": "within",
+            "a": 1,
+            "b": 2,
+            "distance_m": 35
+          }
+        ]
+      },
+      "target_text": "{\"area\":\"Pune\",\"entities\":[{\"id\":1,\"name\":\"pharmacy\",\"tags\":[\"amenity=pharmacy\"]},{\"id\":2,\"name\":\"park\",\"tags\":[\"leisure=park\"]}],\"relations\":[{\"type\":\"within\",\"a\":1,\"b\":2,\"distance_m\":35}]}"
+    }
+  ]
+}

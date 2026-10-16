@@ -1,0 +1,211 @@
+{
+  "handwritten": {
+    "baseline": {
+      "count": 30,
+      "exact_match_pct": 83.33,
+      "tag_precision_pct": 93.44,
+      "tag_recall_pct": 96.61,
+      "tag_f1_pct": 95.0,
+      "relation_accuracy_pct": 96.55,
+      "avg_latency_ms": 0.92
+    },
+    "fine_tuned_model": {
+      "count": 30,
+      "exact_match_pct": 83.33,
+      "tag_precision_pct": 93.44,
+      "tag_recall_pct": 96.61,
+      "tag_f1_pct": 95.0,
+      "relation_accuracy_pct": 96.55,
+      "avg_latency_ms": 995.8,
+      "methods_distribution": {
+        "safety_rule_fallback": 30
+      }
+    }
+  },
+  "held_out_test": {
+    "baseline": {
+      "count": 100,
+      "exact_match_pct": 30.0,
+      "tag_precision_pct": 76.19,
+      "tag_recall_pct": 58.03,
+      "tag_f1_pct": 65.88,
+      "relation_accuracy_pct": 44.09,
+      "avg_latency_ms": 1.03
+    },
+    "fine_tuned_model": {
+      "count": 100,
+      "exact_match_pct": 30.0,
+      "tag_precision_pct": 76.19,
+      "tag_recall_pct": 58.03,
+      "tag_f1_pct": 65.88,
+      "relation_accuracy_pct": 44.09,
+      "avg_latency_ms": 943.59,
+      "methods_distribution": {
+        "safety_rule_fallback": 100
+      }
+    }
+  },
+  "required_prompts_audit": [
+    {
+      "query": "pharmacy near a park in Berlin",
+      "parsed": {
+        "area": "Berlin",
+        "entities": [
+          {
+            "id": 1,
+            "name": "pharmacy",
+            "tags": [
+              "amenity=pharmacy"
+            ]
+          },
+          {
+            "id": 2,
+            "name": "park",
+            "tags": [
+              "leisure=park"
+            ]
+          }
+        ],
+        "relations": [
+          {
+            "type": "within",
+            "a": 1,
+            "b": 2,
+            "distance_m": 150
+          }
+        ]
+      },
+      "latency_ms": 2591.87,
+      "method": "safety_rule_fallback"
+    },
+    {
+      "query": "church within 100 m of a river in Amsterdam",
+      "parsed": {
+        "area": "Amsterdam",
+        "entities": [
+          {
+            "id": 1,
+            "name": "church",
+            "tags": [
+              "amenity=place_of_worship"
+            ]
+          },
+          {
+            "id": 2,
+            "name": "river",
+            "tags": [
+              "waterway=river",
+              "waterway=canal"
+            ]
+          }
+        ],
+        "relations": [
+          {
+            "type": "within",
+            "a": 1,
+            "b": 2,
+            "distance_m": 100
+          }
+        ]
+      },
+      "latency_ms": 107.5,
+      "method": "safety_rule_fallback"
+    },
+    {
+      "query": "bench next to a fountain and a bus stop in Paris",
+      "parsed": {
+        "area": "Paris",
+        "entities": [
+          {
+            "id": 1,
+            "name": "bench",
+            "tags": [
+              "amenity=bench"
+            ]
+          },
+          {
+            "id": 2,
+            "name": "fountain",
+            "tags": [
+              "amenity=fountain"
+            ]
+          },
+          {
+            "id": 3,
+            "name": "bus stop",
+            "tags": [
+              "highway=bus_stop"
+            ]
+          }
+        ],
+        "relations": [
+          {
+            "type": "within",
+            "a": 1,
+            "b": 2,
+            "distance_m": 35
+          },
+          {
+            "type": "within",
+            "a": 1,
+            "b": 3,
+            "distance_m": 35
+          }
+        ]
+      },
+      "latency_ms": 2606.6,
+      "method": "safety_rule_fallback"
+    },
+    {
+      "query": "hospital in London",
+      "parsed": {
+        "area": "London",
+        "entities": [
+          {
+            "id": 1,
+            "name": "hospital",
+            "tags": [
+              "amenity=hospital"
+            ]
+          }
+        ],
+        "relations": []
+      },
+      "latency_ms": 406.87,
+      "method": "safety_rule_fallback"
+    },
+    {
+      "query": "cafetería cerca de una estación en Madrid",
+      "parsed": {
+        "area": "Madrid",
+        "entities": [
+          {
+            "id": 1,
+            "name": "cafe",
+            "tags": [
+              "amenity=cafe"
+            ]
+          },
+          {
+            "id": 2,
+            "name": "train station",
+            "tags": [
+              "railway=station"
+            ]
+          }
+        ],
+        "relations": [
+          {
+            "type": "within",
+            "a": 1,
+            "b": 2,
+            "distance_m": 150
+          }
+        ]
+      },
+      "latency_ms": 440.41,
+      "method": "safety_rule_fallback"
+    }
+  ],
+  "timestamp": "2026-10-07 23:08:20"
+}

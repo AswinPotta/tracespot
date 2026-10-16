@@ -1,0 +1,14 @@
+.venv
+.venv_mac
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.git
+.gitignore
+tests
+*.log
+out.txt
+train_err.txt
+.DS_Store

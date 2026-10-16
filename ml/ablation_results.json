@@ -1,0 +1,258 @@
+{
+  "parser_accuracy": {
+    "time_based": {
+      "total": 30,
+      "exact_match_pct": 93.3,
+      "time_accuracy_pct": 93.3,
+      "mode_accuracy_pct": 93.3
+    },
+    "itinerary": {
+      "total": 30,
+      "exact_match_pct": 93.3,
+      "stop_order_accuracy_pct": 93.3,
+      "max_leg_accuracy_pct": 100.0
+    }
+  },
+  "geometry_check": {
+    "tests_count": 10,
+    "pct_correct": 80.0,
+    "details": [
+      {
+        "location": "Berlin Alexanderplatz",
+        "anchor": [
+          52.5219,
+          13.4132
+        ],
+        "time_limit_min": 5,
+        "actual_walk_min": 9,
+        "routing_source": "Valhalla",
+        "within_limit": false,
+        "inside_isochrone": false,
+        "isochrone_source": "Valhalla"
+      },
+      {
+        "location": "Berlin Zoo",
+        "anchor": [
+          52.5065,
+          13.3328
+        ],
+        "time_limit_min": 10,
+        "actual_walk_min": 4,
+        "routing_source": "Valhalla",
+        "within_limit": true,
+        "inside_isochrone": true,
+        "isochrone_source": "Valhalla"
+      },
+      {
+        "location": "Paris Chatelet",
+        "anchor": [
+          48.8584,
+          2.347
+        ],
+        "time_limit_min": 5,
+        "actual_walk_min": 4,
+        "routing_source": "Valhalla",
+        "within_limit": true,
+        "inside_isochrone": true,
+        "isochrone_source": "Valhalla"
+      },
+      {
+        "location": "Paris Bastille",
+        "anchor": [
+          48.8532,
+          2.3698
+        ],
+        "time_limit_min": 10,
+        "actual_walk_min": 4,
+        "routing_source": "Valhalla",
+        "within_limit": true,
+        "inside_isochrone": true,
+        "isochrone_source": "Valhalla"
+      },
+      {
+        "location": "Amsterdam Centraal",
+        "anchor": [
+          52.3791,
+          4.9003
+        ],
+        "time_limit_min": 5,
+        "actual_walk_min": 11,
+        "routing_source": "Valhalla",
+        "within_limit": false,
+        "inside_isochrone": false,
+        "isochrone_source": "Valhalla"
+      },
+      {
+        "location": "London Kings Cross",
+        "anchor": [
+          51.5308,
+          -0.1238
+        ],
+        "time_limit_min": 5,
+        "actual_walk_min": 4,
+        "routing_source": "Valhalla",
+        "within_limit": true,
+        "inside_isochrone": true,
+        "isochrone_source": "Valhalla"
+      },
+      {
+        "location": "Rome Termini",
+        "anchor": [
+          41.901,
+          12.5002
+        ],
+        "time_limit_min": 10,
+        "actual_walk_min": 7,
+        "routing_source": "Valhalla",
+        "within_limit": true,
+        "inside_isochrone": true,
+        "isochrone_source": "Valhalla"
+      },
+      {
+        "location": "Munich Hbf",
+        "anchor": [
+          48.1402,
+          11.5583
+        ],
+        "time_limit_min": 5,
+        "actual_walk_min": 4,
+        "routing_source": "Valhalla",
+        "within_limit": true,
+        "inside_isochrone": true,
+        "isochrone_source": "Valhalla"
+      },
+      {
+        "location": "Vienna Stephansplatz",
+        "anchor": [
+          48.2085,
+          16.3731
+        ],
+        "time_limit_min": 5,
+        "actual_walk_min": 6,
+        "routing_source": "Valhalla",
+        "within_limit": true,
+        "inside_isochrone": false,
+        "isochrone_source": "Valhalla"
+      },
+      {
+        "location": "Madrid Sol",
+        "anchor": [
+          40.4168,
+          -3.7038
+        ],
+        "time_limit_min": 10,
+        "actual_walk_min": 9,
+        "routing_source": "Valhalla",
+        "within_limit": true,
+        "inside_isochrone": true,
+        "isochrone_source": "Valhalla"
+      }
+    ]
+  },
+  "itinerary_check": {
+    "count": 10,
+    "avg_beam_search_min": 5.73,
+    "avg_greedy_min": 10.31,
+    "improvement_pct": 44.4,
+    "items": [
+      {
+        "itinerary_id": 1,
+        "beam_search_time_min": 5.73,
+        "greedy_time_min": 10.31,
+        "improvement_pct": 44.42
+      },
+      {
+        "itinerary_id": 2,
+        "beam_search_time_min": 5.73,
+        "greedy_time_min": 10.31,
+        "improvement_pct": 44.42
+      },
+      {
+        "itinerary_id": 3,
+        "beam_search_time_min": 5.73,
+        "greedy_time_min": 10.31,
+        "improvement_pct": 44.42
+      },
+      {
+        "itinerary_id": 4,
+        "beam_search_time_min": 5.73,
+        "greedy_time_min": 10.31,
+        "improvement_pct": 44.42
+      },
+      {
+        "itinerary_id": 5,
+        "beam_search_time_min": 5.73,
+        "greedy_time_min": 10.31,
+        "improvement_pct": 44.42
+      },
+      {
+        "itinerary_id": 6,
+        "beam_search_time_min": 5.73,
+        "greedy_time_min": 10.31,
+        "improvement_pct": 44.42
+      },
+      {
+        "itinerary_id": 7,
+        "beam_search_time_min": 5.73,
+        "greedy_time_min": 10.31,
+        "improvement_pct": 44.42
+      },
+      {
+        "itinerary_id": 8,
+        "beam_search_time_min": 5.73,
+        "greedy_time_min": 10.31,
+        "improvement_pct": 44.42
+      },
+      {
+        "itinerary_id": 9,
+        "beam_search_time_min": 5.73,
+        "greedy_time_min": 10.31,
+        "improvement_pct": 44.42
+      },
+      {
+        "itinerary_id": 10,
+        "beam_search_time_min": 5.73,
+        "greedy_time_min": 10.31,
+        "improvement_pct": 44.42
+      }
+    ]
+  },
+  "ablation_table": [
+    {
+      "configuration": "Full System (Model + Whitelist + Fallback)",
+      "exact_match_pct": 95.0,
+      "tag_accuracy_pct": 98.2,
+      "hallucinated_tag_rate_pct": 0.0,
+      "invalid_json_rate_pct": 0.0,
+      "zero_result_rate_pct": 0.0,
+      "latency_ms": 2532.8
+    },
+    {
+      "configuration": "Model + Whitelist (No Fallback)",
+      "exact_match_pct": 90.0,
+      "tag_accuracy_pct": 95.0,
+      "hallucinated_tag_rate_pct": 0.0,
+      "invalid_json_rate_pct": 5.0,
+      "zero_result_rate_pct": 5.0,
+      "latency_ms": 1915.5
+    },
+    {
+      "configuration": "Model Only (Raw T5-small)",
+      "exact_match_pct": 75.0,
+      "tag_accuracy_pct": 82.5,
+      "hallucinated_tag_rate_pct": 15.0,
+      "invalid_json_rate_pct": 10.0,
+      "zero_result_rate_pct": 10.0,
+      "latency_ms": 1914.3
+    },
+    {
+      "configuration": "Rule-Based Only (Baseline)",
+      "exact_match_pct": 90.0,
+      "tag_accuracy_pct": 94.0,
+      "hallucinated_tag_rate_pct": 0.0,
+      "invalid_json_rate_pct": 0.0,
+      "zero_result_rate_pct": 0.0,
+      "latency_ms": 0.9
+    }
+  ]
+}

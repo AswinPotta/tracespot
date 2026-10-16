@@ -1,0 +1,21 @@
+# Python virtual environments & bytecode
+.venv/
+.venv*/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Pytest / Testing
+.pytest_cache/
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Scratch and logs
+*.log
+out.txt
+train_err.txt
+
+# Model checkpoints (large binary files, let HuggingFace or S3 host weights if needed)
+ml/model_checkpoint/
