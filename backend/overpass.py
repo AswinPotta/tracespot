@@ -19,12 +19,12 @@ OVERPASS_MIRRORS = [
     "https://overpass-api.de/api/interpreter",
     "https://lz4.overpass-api.de/api/interpreter",
     "https://z.overpass-api.de/api/interpreter",
-    "https://overpass.kumi.systems/api/interpreter",
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
     "https://overpass.private.coffee/api/interpreter",
 ]
 
 
-USER_AGENT = "TraceSpot-Research/1.0 (academic NLP OSM project; student@university.edu)"
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) TraceSpotApp/2.0 (Academic Research; contact@tracespot.app)"
 
 
 class OverpassError(Exception):
@@ -165,12 +165,13 @@ async def execute_overpass_query(ql_query: str) -> Dict[str, Any]:
     last_error = None
     headers = {
         "User-Agent": USER_AGENT,
-        "Accept": "*/*"
+        "Accept": "*/*",
+        "Referer": "https://tracespot-8ev9.onrender.com"
     }
 
     for mirror in OVERPASS_MIRRORS:
         try:
-            async with httpx.AsyncClient(timeout=12.0) as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 resp = await client.post(mirror, data={"data": ql_query}, headers=headers)
 
                 if resp.status_code == 200:
