@@ -143,6 +143,32 @@ CONCEPT_MAP: Dict[str, Tuple[str, List[str]]] = {
     "supermarket": ("supermarket", ["shop=supermarket"]),
     "supermarkets": ("supermarket", ["shop=supermarket"]),
     "grocery store": ("supermarket", ["shop=supermarket"]),
+    "grocery": ("supermarket", ["shop=supermarket"]),
+    "convenience store": ("convenience store", ["shop=convenience"]),
+
+    # Financial & Shopping
+    "atm": ("atm", ["amenity=atm"]),
+    "atms": ("atm", ["amenity=atm"]),
+    "cash machine": ("atm", ["amenity=atm"]),
+    "cash point": ("atm", ["amenity=atm"]),
+    "bank": ("bank", ["amenity=bank"]),
+    "banks": ("bank", ["amenity=bank"]),
+    "mall": ("shopping mall", ["shop=mall"]),
+    "malls": ("shopping mall", ["shop=mall"]),
+    "shopping mall": ("shopping mall", ["shop=mall"]),
+    "bookstore": ("bookstore", ["shop=books"]),
+    "book shop": ("bookstore", ["shop=books"]),
+    "clothing store": ("clothing store", ["shop=clothes"]),
+
+    # Wellness & Fitness
+    "gym": ("gym", ["leisure=fitness_centre"]),
+    "gyms": ("gym", ["leisure=fitness_centre"]),
+    "fitness centre": ("gym", ["leisure=fitness_centre"]),
+    "fitness center": ("gym", ["leisure=fitness_centre"]),
+
+    # Aviation
+    "airport": ("airport", ["aeroway=aerodrome"]),
+    "airports": ("airport", ["aeroway=aerodrome"]),
 }
 
 POPULAR_CITIES = [

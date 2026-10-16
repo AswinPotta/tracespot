@@ -5,6 +5,7 @@ executes queries with mirror failover, caching, retries,
 and handles auto-relaxation when 0 results are returned.
 """
 
+import math
 import hashlib
 import json
 import time
@@ -16,11 +17,10 @@ from backend.db import get_cached_overpass, set_cached_overpass
 
 # Overpass API Mirrors for high reliability failover
 OVERPASS_MIRRORS = [
+    "https://overpass.openstreetmap.fr/api/interpreter",
     "https://overpass-api.de/api/interpreter",
     "https://lz4.overpass-api.de/api/interpreter",
     "https://z.overpass-api.de/api/interpreter",
-    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
-    "https://overpass.private.coffee/api/interpreter",
 ]
 
 
@@ -171,7 +171,7 @@ async def execute_overpass_query(ql_query: str) -> Dict[str, Any]:
 
     for mirror in OVERPASS_MIRRORS:
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=8.0) as client:
                 resp = await client.post(mirror, data={"data": ql_query}, headers=headers)
 
                 if resp.status_code == 200:
@@ -181,20 +181,96 @@ async def execute_overpass_query(ql_query: str) -> Dict[str, Any]:
                     return data
                 elif resp.status_code == 429:
                     last_error = f"Mirror {mirror} returned status 429 (rate limited)"
-                    await asyncio.sleep(2.0)
                     continue
                 elif resp.status_code == 504:
                     last_error = f"Mirror {mirror} returned status 504 (timeout)"
-                    await asyncio.sleep(1.0)
                     continue
                 else:
                     last_error = f"Mirror {mirror} returned error {resp.status_code}: {resp.text[:150]}"
-        except httpx.RequestError as exc:
+        except (httpx.RequestError, httpx.TimeoutException) as exc:
             last_error = f"Mirror {mirror} connection error: {str(exc)}"
             continue
 
-
     raise OverpassError(f"All Overpass mirrors failed or timed out. Last error: {last_error}")
+
+
+async def fetch_places_via_nominatim(
+    tags: List[str],
+    lat: float,
+    lon: float,
+    radius_km: float = 4.0,
+    limit: int = 25,
+    concept_name: str = ""
+) -> List[Dict[str, Any]]:
+    """
+    High-speed OpenStreetMap Nominatim candidate retrieval.
+    Translates results into standard OSM element dictionaries compatible with Overpass.
+    """
+    dlat = radius_km / 111.0
+    dlon = radius_km / (111.0 * max(0.2, math.cos(math.radians(lat))))
+    left, top, right, bottom = lon - dlon, lat + dlat, lon + dlon, lat - dlat
+    viewbox = f"{left:.5f},{top:.5f},{right:.5f},{bottom:.5f}"
+
+    headers = {
+        "User-Agent": USER_AGENT,
+        "Accept": "application/json"
+    }
+
+    elements: List[Dict[str, Any]] = []
+    seen_ids = set()
+
+    for tag in tags:
+        key, val = (tag.split("=", 1) if "=" in tag else (tag, ""))
+        params = {
+            "viewbox": viewbox,
+            "bounded": 1,
+            "format": "jsonv2",
+            "limit": limit
+        }
+        if key == "amenity" and val:
+            params["amenity"] = val
+        else:
+            search_term = concept_name or val.replace("_", " ") or key
+            params["q"] = search_term
+
+        try:
+            async with httpx.AsyncClient(timeout=6.0) as client:
+                resp = await client.get("https://nominatim.openstreetmap.org/search", params=params, headers=headers)
+                if resp.status_code == 200:
+                    places = resp.json()
+                    for p in places:
+                        osm_id = str(p.get("osm_id", ""))
+                        if not osm_id or osm_id in seen_ids:
+                            continue
+                        seen_ids.add(osm_id)
+
+                        raw_name = p.get("name") or (p.get("display_name", "").split(",")[0] if p.get("display_name") else "Place")
+                        p_lat = float(p.get("lat", 0.0))
+                        p_lon = float(p.get("lon", 0.0))
+                        osm_type = p.get("osm_type", "node")
+
+                        elem_tags = {
+                            "name": raw_name,
+                            key: val if val else p.get("type", ""),
+                            p.get("category", "amenity"): p.get("type", "")
+                        }
+                        if p.get("category") == "amenity":
+                            elem_tags["amenity"] = p.get("type", "")
+
+                        elements.append({
+                            "type": osm_type,
+                            "id": int(osm_id) if osm_id.isdigit() else osm_id,
+                            "lat": p_lat,
+                            "lon": p_lon,
+                            "tags": elem_tags
+                        })
+        except Exception:
+            pass
+
+        if len(elements) >= limit:
+            break
+
+    return elements
 
 
 async def search_with_auto_relax(
@@ -202,53 +278,115 @@ async def search_with_auto_relax(
     spatial_target: Union[Tuple[float, float], Tuple[float, float, float, float]]
 ) -> Tuple[Dict[str, Any], str, str]:
     """
-    Executes search with auto-relaxation:
-    If 0 results are returned, widens the proximity distance or drops weakest constraint.
-    Returns: (raw_overpass_result, executed_ql, relaxation_message)
+    Executes search with auto-relaxation and zero-crash Nominatim fallback:
+    1. Try Overpass with initial constraints
+    2. If 0 results, relax distance (2.5x) or expand radius (to 8km)
+    3. If Overpass fails or still 0 results, fall back to Nominatim with Python proximity filtering.
     """
-    # Stage 0: Initial search
+    from backend.routing import haversine_m
+
+    lat_c, lon_c = spatial_target[:2] if len(spatial_target) == 2 else ((spatial_target[0] + spatial_target[2]) / 2, (spatial_target[1] + spatial_target[3]) / 2)
+
+    overpass_failed = False
     ql_initial = build_overpass_ql(query_obj, spatial_target)
-    res = await execute_overpass_query(ql_initial)
-    elements = res.get("elements", [])
+    res = {"elements": []}
 
-    if len(elements) > 0:
-        return res, ql_initial, ""
+    try:
+        res = await execute_overpass_query(ql_initial)
+        elements = res.get("elements", [])
+        if len(elements) > 0:
+            return res, ql_initial, ""
+    except OverpassError:
+        overpass_failed = True
 
-    # If query has no relations, widen radius
-    if not query_obj.relations:
-        ql_wider = build_overpass_ql(query_obj, spatial_target, radius_m=6000)
-        res_wider = await execute_overpass_query(ql_wider)
-        if len(res_wider.get("elements", [])) > 0:
-            return res_wider, ql_wider, "Expanded search radius around city center to 6km."
-        return res, ql_initial, "No places matched in this area."
+    # If Overpass is alive but returned 0 results:
+    if not overpass_failed:
+        # Stage 1: Auto-Relax - Widen distance by 2.5x
+        if query_obj.relations:
+            dist_override = {}
+            for r in query_obj.relations:
+                new_dist = min(int(r.distance_m * 2.5), 1500)
+                dist_override[(r.a, r.b)] = new_dist
+            ql_relaxed_dist = build_overpass_ql(query_obj, spatial_target, distance_override=dist_override)
+            try:
+                res_relaxed = await execute_overpass_query(ql_relaxed_dist)
+                if len(res_relaxed.get("elements", [])) > 0:
+                    orig_dist = query_obj.relations[0].distance_m
+                    new_d = dist_override.get((query_obj.relations[0].a, query_obj.relations[0].b), orig_dist * 2)
+                    msg = f"Auto-relaxed distance from {orig_dist}m to {new_d}m to find nearby matches."
+                    return res_relaxed, ql_relaxed_dist, msg
+            except OverpassError:
+                overpass_failed = True
 
-    # Stage 1: Auto-Relax - Widen distance by 2.5x (e.g. 100m -> 250m)
-    dist_override = {}
-    for r in query_obj.relations:
-        new_dist = min(int(r.distance_m * 2.5), 1500)
-        dist_override[(r.a, r.b)] = new_dist
+        # Stage 2: Widen spatial radius to 8km
+        if not overpass_failed:
+            ql_wider = build_overpass_ql(query_obj, spatial_target, radius_m=8000)
+            try:
+                res_wider = await execute_overpass_query(ql_wider)
+                if len(res_wider.get("elements", [])) > 0:
+                    return res_wider, ql_wider, "Expanded search area radius to 8km around city center."
+            except OverpassError:
+                overpass_failed = True
 
-    ql_relaxed_dist = build_overpass_ql(query_obj, spatial_target, distance_override=dist_override)
-    res_relaxed = await execute_overpass_query(ql_relaxed_dist)
-    if len(res_relaxed.get("elements", [])) > 0:
-        orig_dist = query_obj.relations[0].distance_m
-        new_d = dist_override.get((query_obj.relations[0].a, query_obj.relations[0].b), orig_dist * 2)
-        msg = f"Auto-relaxed distance from {orig_dist}m to {new_d}m to find nearby matches."
-        return res_relaxed, ql_relaxed_dist, msg
+    # Stage 3: Universal Nominatim Fallback (Zero crash guarantee)
+    primary_entity = query_obj.entities[0]
+    primary_cands = await fetch_places_via_nominatim(
+        tags=primary_entity.tags,
+        lat=lat_c,
+        lon=lon_c,
+        radius_km=6.0,
+        limit=30,
+        concept_name=primary_entity.name
+    )
 
-    # Stage 2: If multi-relation (e.g. 2 relations), drop the second constraint
-    if len(query_obj.relations) >= 2:
-        drop = [(query_obj.relations[-1].a, query_obj.relations[-1].b)]
-        ql_dropped = build_overpass_ql(query_obj, spatial_target, drop_relations=drop)
-        res_dropped = await execute_overpass_query(ql_dropped)
-        if len(res_dropped.get("elements", [])) > 0:
-            dropped_b = query_obj.relations[-1].b
-            entity_name = next((e.name for e in query_obj.entities if e.id == dropped_b), "secondary constraint")
-            msg = f"Auto-relaxed query: dropped constraint for '{entity_name}' to return best available places."
-            return res_dropped, ql_dropped, msg
+    if not primary_cands:
+        primary_cands = await fetch_places_via_nominatim(
+            tags=primary_entity.tags,
+            lat=lat_c,
+            lon=lon_c,
+            radius_km=12.0,
+            limit=25,
+            concept_name=primary_entity.name
+        )
 
-    # Return empty result with clear message
-    return res, ql_initial, "0 results found even after auto-relaxation."
+    if not query_obj.relations or not primary_cands:
+        return {"elements": primary_cands}, ql_initial, "Retrieved live OpenStreetMap places via high-speed Nominatim index."
+
+    # If query has relations (e.g. restaurant near beach), fetch related entities and match in Python
+    rel_entity = query_obj.entities[1] if len(query_obj.entities) > 1 else query_obj.entities[0]
+    rel_cands = await fetch_places_via_nominatim(
+        tags=rel_entity.tags,
+        lat=lat_c,
+        lon=lon_c,
+        radius_km=10.0,
+        limit=20,
+        concept_name=rel_entity.name
+    )
+
+    max_dist = query_obj.relations[0].distance_m or 300
+    matched_primary = []
+    matched_rel = []
+
+    # Try matching within strict distance or relaxed distance
+    for max_d in [max_dist, max_dist * 2.5, 1200]:
+        matched_primary.clear()
+        matched_rel.clear()
+        for p in primary_cands:
+            for r in rel_cands:
+                d = haversine_m(p["lat"], p["lon"], r["lat"], r["lon"])
+                if d <= max_d:
+                    if p not in matched_primary:
+                        matched_primary.append(p)
+                    if r not in matched_rel:
+                        matched_rel.append(r)
+        if matched_primary:
+            break
+
+    if matched_primary:
+        combined = matched_primary + matched_rel
+        return {"elements": combined}, ql_initial, f"Auto-matched nearby {rel_entity.name} in OpenStreetMap via spatial proximity index."
+    else:
+        return {"elements": primary_cands}, ql_initial, f"Showing closest {primary_entity.name}s in {query_obj.area} (no exact match directly beside {rel_entity.name})."
 
 
 async def query_nearby_essentials(lat: float, lon: float, radius_m: int = 500) -> Dict[str, Any]:
@@ -356,8 +494,13 @@ async def search_time_based_with_isochrone(
     ql_lines.append("out center 60;")
     executed_ql = "\n".join(ql_lines)
 
-    raw_res = await execute_overpass_query(executed_ql)
-    elements = raw_res.get("elements", [])
+    try:
+        raw_res = await execute_overpass_query(executed_ql)
+        elements = raw_res.get("elements", [])
+    except Exception:
+        primary_el = await fetch_places_via_nominatim(primary_entity.tags, lat_center, lon_center, radius_km=5.0, concept_name=primary_entity.name)
+        anchor_el = await fetch_places_via_nominatim(anchor_entity.tags, lat_center, lon_center, radius_km=5.0, concept_name=anchor_entity.name)
+        elements = primary_el + anchor_el
 
     raw_candidates = []
     raw_anchors = []

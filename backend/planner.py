@@ -15,7 +15,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from shapely.geometry import Point
 
 from ml.schema import TraceSpotQuery, Itinerary, Stop
-from backend.overpass import execute_overpass_query, build_tag_filter
+from backend.overpass import execute_overpass_query, build_tag_filter, fetch_places_via_nominatim
 from backend.routing import get_walking_distance_matrix, get_walking_route, haversine_m
 from backend.ranker import element_matches_tags, get_element_coords, generate_verification_links
 
@@ -44,7 +44,7 @@ def build_itinerary_overpass_ql(
             lines.append(f"  way(around:{radius_m}, {lat:.5f}, {lon:.5f}){t_filter};")
 
     lines.append(");")
-    lines.append(f"out center {max_per_stop * len(itinerary.stops)};")
+    lines.append("out center 150;")
     return "\n".join(lines)
 
 
@@ -146,10 +146,13 @@ async def plan_itinerary(
     start_time = time.perf_counter()
     lat_center, lon_center = spatial_center
 
-    # 1. Fetch Candidates via Overpass
+    # 1. Fetch Candidates via Overpass (with failover)
     ql = build_itinerary_overpass_ql(itinerary, spatial_center, radius_m=radius_m)
-    raw_overpass = await execute_overpass_query(ql)
-    elements = raw_overpass.get("elements", [])
+    try:
+        raw_overpass = await execute_overpass_query(ql)
+        elements = raw_overpass.get("elements", [])
+    except Exception:
+        elements = []
 
     # Partition candidates by stop index
     candidates_by_stop: List[List[Dict[str, Any]]] = [[] for _ in itinerary.stops]
@@ -183,14 +186,44 @@ async def plan_itinerary(
                     "verification_links": generate_verification_links(osm_type, osm_id, p_lat, p_lon, tags)
                 })
 
-    # Sort candidates by proximity to center and limit to top 15 per stop
+    # Sort candidates by proximity to center; if any stop has 0 results, fetch via Nominatim!
     for s_idx in range(len(itinerary.stops)):
+        stop = itinerary.stops[s_idx]
+        if len(candidates_by_stop[s_idx]) == 0:
+            nom_places = await fetch_places_via_nominatim(
+                tags=stop.tags,
+                lat=lat_center,
+                lon=lon_center,
+                radius_km=4.5,
+                limit=15,
+                concept_name=stop.name
+            )
+            for p in nom_places:
+                p_lat, p_lon = p["lat"], p["lon"]
+                tags = p.get("tags", {})
+                osm_id = str(p.get("id"))
+                osm_type = p.get("type", "node")
+                dist = haversine_m(p_lat, p_lon, lat_center, lon_center)
+                name = tags.get("name") or f"{stop.name.title()}"
+                candidates_by_stop[s_idx].append({
+                    "id": f"{osm_type}_{osm_id}",
+                    "osm_id": osm_id,
+                    "osm_type": osm_type,
+                    "name": name,
+                    "stop_concept": stop.name,
+                    "stop_index": s_idx + 1,
+                    "lat": p_lat,
+                    "lon": p_lon,
+                    "tags": tags,
+                    "dist_to_center": dist,
+                    "verification_links": generate_verification_links(osm_type, osm_id, p_lat, p_lon, tags)
+                })
+
         candidates_by_stop[s_idx].sort(key=lambda x: x["dist_to_center"])
         candidates_by_stop[s_idx] = candidates_by_stop[s_idx][:15]
 
-        # If a stop returned 0 results, create a synthetic fallback place near center
+        # If a stop returned 0 results even from Nominatim, create a synthetic fallback place near center
         if len(candidates_by_stop[s_idx]) == 0:
-            stop = itinerary.stops[s_idx]
             offset_lat = lat_center + (s_idx * 0.003)
             offset_lon = lon_center + (s_idx * 0.003)
             fallback_cand = {

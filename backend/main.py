@@ -220,8 +220,10 @@ async def search_endpoint(req: SearchRequest):
     # Case C: Standard Spatial Proximity Search
     try:
         raw_overpass, executed_ql, relax_msg = await search_with_auto_relax(parsed_query, spatial_target)
-    except OverpassError as oe:
-        raise HTTPException(status_code=502, detail=str(oe))
+    except Exception as e:
+        raw_overpass = {"elements": []}
+        executed_ql = ""
+        relax_msg = f"Search fallback: {str(e)}"
 
     ranked_places = rank_and_explain_results(raw_overpass, parsed_query)
     total_latency_ms = round((time.perf_counter() - total_start) * 1000, 2)
