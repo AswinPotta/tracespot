@@ -23,7 +23,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 # Copy requirements and install remaining dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
 
 # Copy application source code
 COPY . .

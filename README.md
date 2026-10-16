@@ -1,4 +1,17 @@
+---
+title: TraceSpot
+emoji: 🗺️
+colorFrom: indigo
+colorTo: purple
+sdk: docker
+app_port: 8000
+pinned: false
+---
+
 # TraceSpot: Natural-Language Geospatial Search & Multi-Stop Itineraries on OpenStreetMap
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/AswinPotta/tracespot)
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/new?template=https://github.com/AswinPotta/tracespot)
 
 **TraceSpot** is a complete, original, and reliable geospatial search and itinerary planning web application built entirely on **OpenStreetMap (OSM)** data and free OSM-based routing services. Inspired by the ACL 2025 paper *"SPOT: Bridging Natural Language and Geospatial Search for Investigative Journalism"*, TraceSpot translates complex English natural language geospatial queries into structured schemas, synthesizes spatial Overpass QL queries, computes walking reach isochrones, solves multi-stop itineraries using beam search optimization, and visualizes places, reach polygons, and routes on a dark glassmorphism Leaflet map.
 
