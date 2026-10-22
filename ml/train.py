@@ -93,10 +93,17 @@ def train_model(
     print("TraceSpot T5-Small Fine-Tuning Pipeline (Low-Memory CPU/GPU)")
     print("=" * 60)
 
-    device = torch.device("cuda" if torch.cuda.is_available() and not force_cpu else "cpu")
+    if not force_cpu and torch.backends.mps.is_available():
+        device = torch.device("mps")
+    elif not force_cpu and torch.cuda.is_available():
+        device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
     print(f"[*] Compute Device: {device}")
     if device.type == "cuda":
         print(f"[*] GPU Name: {torch.cuda.get_device_name(0)}")
+    elif device.type == "mps":
+        print("[*] Apple Silicon M-Series Metal Performance Shaders (MPS) active")
 
     model_name = "t5-small"
     print(f"[*] Loading pretrained tokenizer and model: {model_name}...")

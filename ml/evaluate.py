@@ -186,7 +186,15 @@ class TraceSpotInferenceEngine:
         self.checkpoint_dir = checkpoint_dir
         self.model = None
         self.tokenizer = None
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu") if (HAS_TORCH and torch is not None) else "cpu"
+        if HAS_TORCH and torch is not None:
+            if torch.backends.mps.is_available():
+                self.device = torch.device("mps")
+            elif torch.cuda.is_available():
+                self.device = torch.device("cuda")
+            else:
+                self.device = torch.device("cpu")
+        else:
+            self.device = "cpu"
         if HAS_TORCH and torch is not None:
             self.load_model()
         else:
@@ -234,18 +242,63 @@ class TraceSpotInferenceEngine:
 
         decoded = self.tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
 
-        # Safety layer: validate JSON and tags
+        # Robust extraction layer: handles standard JSON and T5 sequence formats
         try:
-            json_match = re.search(r'\{.*\}', decoded)
-            if json_match:
-                raw_dict = json.loads(json_match.group(0))
-            else:
-                raw_dict = json.loads(decoded)
+            raw_dict = None
+            # 1. Try direct or brace-wrapped json.loads
+            clean_str = decoded.strip()
+            if not clean_str.startswith("{"):
+                clean_str = "{" + clean_str
+            if not clean_str.endswith("}"):
+                clean_str = clean_str + "}"
+            try:
+                raw_dict = json.loads(clean_str)
+            except Exception:
+                pass
+
+            # 2. If not valid json, extract structured fields from T5 decoded representation
+            if not raw_dict or not isinstance(raw_dict, dict) or "entities" not in raw_dict:
+                area_m = re.search(r'\"area\"\s*:\s*\"([^\"]+)\"', decoded)
+                area = area_m.group(1) if area_m else "Berlin"
+
+                entities = []
+                ent_matches = re.finditer(r'\"id\"\s*:\s*(\d+)\s*,\s*\"name\"\s*:\s*\"([^\"]+)\"\s*,\s*\"tags\"\s*:\s*\[(.*?)\]', decoded)
+                for m in ent_matches:
+                    eid = int(m.group(1))
+                    ename = m.group(2)
+                    raw_tags = m.group(3)
+                    tags = [t.strip(' "\'') for t in raw_tags.split(',') if t.strip(' "\'')]
+                    entities.append({"id": eid, "name": ename, "tags": tags})
+
+                relations = []
+                rel_matches = re.finditer(r'\"type\"\s*:\s*\"([^\"]+)\"\s*,\s*\"a\"\s*:\s*(\d+)\s*,\s*\"b\"\s*:\s*(\d+)(?:,\s*\"distance_m\"\s*:\s*(\d+))?(?:,\s*\"time_min\"\s*:\s*(\d+))?(?:,\s*\"mode\"\s*:\s*\"([^\"]+)\")?', decoded)
+                for rm in rel_matches:
+                    rtype = rm.group(1)
+                    a = int(rm.group(2))
+                    b = int(rm.group(3))
+                    dist_m = int(rm.group(4)) if rm.group(4) else None
+                    time_min = int(rm.group(5)) if rm.group(5) else None
+                    mode = rm.group(6) if rm.group(6) else "walk"
+                    r_dict = {"type": rtype, "a": a, "b": b}
+                    if dist_m is not None:
+                        r_dict["distance_m"] = dist_m
+                    if time_min is not None:
+                        r_dict["time_min"] = time_min
+                        r_dict["mode"] = mode
+                    relations.append(r_dict)
+
+                if entities:
+                    raw_dict = {"area": area, "entities": entities, "relations": relations}
+
+            if not raw_dict:
+                raise ValueError("Could not extract entities from model output")
+
+            # 3. Schema validation and RapidFuzz tag whitelist guardrail
             validated = sanitize_and_validate_dict(raw_dict)
             latency = (time.perf_counter() - start) * 1000
             return validated, latency, "t5_fine_tuned"
         except Exception:
-            # Fallback to rule parser
+            # Controlled fallback to rule parser
             validated = parse_query_rule_based(query_text)
             latency = (time.perf_counter() - start) * 1000
             return validated, latency, "safety_rule_fallback"

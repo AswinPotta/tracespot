@@ -17,10 +17,10 @@ from backend.db import get_cached_overpass, set_cached_overpass
 
 # Overpass API Mirrors for high reliability failover
 OVERPASS_MIRRORS = [
-    "https://overpass.openstreetmap.fr/api/interpreter",
     "https://overpass-api.de/api/interpreter",
     "https://lz4.overpass-api.de/api/interpreter",
     "https://z.overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
 ]
 
 
@@ -171,7 +171,7 @@ async def execute_overpass_query(ql_query: str) -> Dict[str, Any]:
 
     for mirror in OVERPASS_MIRRORS:
         try:
-            async with httpx.AsyncClient(timeout=8.0) as client:
+            async with httpx.AsyncClient(timeout=3.5) as client:
                 resp = await client.post(mirror, data={"data": ql_query}, headers=headers)
 
                 if resp.status_code == 200:
@@ -305,13 +305,14 @@ async def search_with_auto_relax(
         if query_obj.relations:
             dist_override = {}
             for r in query_obj.relations:
-                new_dist = min(int(r.distance_m * 2.5), 1500)
+                r_dist = r.distance_m if r.distance_m is not None else int((r.time_min or 5) * 80)
+                new_dist = min(int(r_dist * 2.5), 1500)
                 dist_override[(r.a, r.b)] = new_dist
             ql_relaxed_dist = build_overpass_ql(query_obj, spatial_target, distance_override=dist_override)
             try:
                 res_relaxed = await execute_overpass_query(ql_relaxed_dist)
                 if len(res_relaxed.get("elements", [])) > 0:
-                    orig_dist = query_obj.relations[0].distance_m
+                    orig_dist = query_obj.relations[0].distance_m or 300
                     new_d = dist_override.get((query_obj.relations[0].a, query_obj.relations[0].b), orig_dist * 2)
                     msg = f"Auto-relaxed distance from {orig_dist}m to {new_d}m to find nearby matches."
                     return res_relaxed, ql_relaxed_dist, msg

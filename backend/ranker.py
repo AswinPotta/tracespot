@@ -148,8 +148,9 @@ def rank_and_explain_results(
                             best_ref_el = ctx_el
                             best_ref_coords = (c_lat, c_lon)
 
-                # Did we find a context item within target threshold (with 20% slack)?
-                threshold = rel.distance_m * 1.2
+                # Strict distance verification without slack
+                req_dist = rel.distance_m if rel.distance_m is not None else int((rel.time_min or 5) * 80)
+                threshold = float(req_dist)
                 if best_ref_el and best_dist <= threshold:
                     relations_satisfied += 1
                     ref_name = best_ref_el.get("tags", {}).get("name") or ref_entity.name
@@ -169,17 +170,18 @@ def rank_and_explain_results(
                         ]
                     })
                 elif best_ref_el:
-                    # Found but slightly farther
+                    # Found but farther than requested constraint
                     dist_int = int(round(best_dist))
                     ref_name = best_ref_el.get("tags", {}).get("name") or ref_entity.name
-                    explanations.append(f"{dist_int} m from {ref_name} (exceeds {rel.distance_m}m threshold)")
+                    explanations.append(f"{dist_int} m from {ref_name} (exceeds {req_dist}m constraint)")
 
             # Compute score
             rel_ratio = relations_satisfied / total_relations if total_relations > 0 else 1.0
             # Distance fit bonus if closer than requested
             if matched_related_objects:
                 avg_dist = sum(r["distance_m"] for r in matched_related_objects) / len(matched_related_objects)
-                dist_penalty = min(avg_dist / (query_obj.relations[0].distance_m + 1), 1.0) * 0.2
+                base_req = query_obj.relations[0].distance_m or 300
+                dist_penalty = min(avg_dist / (base_req + 1), 1.0) * 0.2
             else:
                 dist_penalty = 0.3
 

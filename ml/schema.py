@@ -200,10 +200,30 @@ def sanitize_tag(raw_tag: str, threshold: float = 75.0) -> Optional[str]:
     if raw_tag in OSM_TAG_WHITELIST:
         return raw_tag
 
+    # Common tag category aliases
+    tag_aliases = {
+        "amenity=park": "leisure=park",
+        "amenity=garden": "leisure=garden",
+        "amenity=museum": "tourism=museum",
+        "amenity=hotel": "tourism=hotel",
+        "amenity=supermarket": "shop=supermarket",
+        "amenity=bakery": "shop=bakery",
+        "amenity=river": "waterway=river",
+        "amenity=tree": "natural=tree",
+        "amenity=subway": "railway=subway_entrance",
+        "amenity=metro": "railway=subway_entrance",
+        "amenity=train": "railway=station",
+        "amenity=railway": "railway=station",
+    }
+    if raw_tag in tag_aliases:
+        return tag_aliases[raw_tag]
+
     # If format is key:value or key-value, normalize to key=value
     normalized = re.sub(r'[:\-]', '=', raw_tag, count=1)
     if normalized in OSM_TAG_WHITELIST:
         return normalized
+    if normalized in tag_aliases:
+        return tag_aliases[normalized]
 
     # Fuzzy match with rapidfuzz
     match, score, _ = process.extractOne(raw_tag, WHITELIST_KEYS, scorer=fuzz.WRatio)
